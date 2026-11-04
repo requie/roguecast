@@ -34,8 +34,13 @@ def validate(df: pd.DataFrame, horizon_minutes: int = 30) -> pd.DataFrame:
     if df.empty:
         raise ValueError("No observations")
     data = df.copy()
+    # A malformed nonblank outcome is not evidence of a negative outcome.
+    raw_outcome = data["outcome_at"]
+    blank_outcome = raw_outcome.isna() | raw_outcome.astype(str).str.strip().eq("")
     for column in ("observed_at", "followup_until", "outcome_at"):
         data[column] = pd.to_datetime(data[column], utc=True, errors="coerce")
+    if (data["outcome_at"].isna() & ~blank_outcome).any():
+        raise ValueError("Unparseable nonempty outcome_at timestamp")
     if data["observed_at"].isna().any() or data["followup_until"].isna().any():
         raise ValueError("Invalid observed_at or followup_until timestamps")
     if not data["label"].isin([0, 1]).all():
@@ -87,9 +92,9 @@ def split_chronological(data: pd.DataFrame, test_fraction: float = 0.25, horizon
 
 
 def baseline() -> Pipeline:
-    numeric = Pipeline([("impute", SimpleImputer(strategy="median")),
+    numeric = Pipeline([("impute", SimpleImputer(strategy="constant", fill_value=0, keep_empty_features=True)),
                         ("scale", StandardScaler())])
-    categorical = Pipeline([("impute", SimpleImputer(strategy="most_frequent")),
+    categorical = Pipeline([("impute", SimpleImputer(strategy="constant", fill_value="unknown", keep_empty_features=True)),
                             ("onehot", OneHotEncoder(handle_unknown="ignore"))])
     return Pipeline([
         ("features", ColumnTransformer([
