@@ -43,3 +43,24 @@ def test_metrics_handle_one_class():
     m = metrics([0, 0], [0.1, 0.3])
     assert m["roc_auc"] is None
     assert m["prevalence"] == 0.0
+
+
+def test_rejects_nonempty_malformed_outcome():
+    r = row(1, 0, False)
+    r["outcome_at"] = "not-a-timestamp"
+    with pytest.raises(ValueError, match="Unparseable nonempty outcome_at"):
+        validate(pd.DataFrame([r]))
+
+
+def test_model_handles_all_missing_features():
+    from roguecast.model import baseline
+    rows = [row(i, 0, i % 2 == 0) for i in range(12)]
+    df = validate(pd.DataFrame(rows))
+    for column in FEATURES:
+        df[column] = float("nan")
+    train, test = split_chronological(df)
+    model = baseline()
+    model.fit(train[FEATURES], train["label"])
+    probabilities = model.predict_proba(test[FEATURES])[:, 1]
+    assert len(probabilities) == len(test)
+    assert ((probabilities >= 0) & (probabilities <= 1)).all()
