@@ -70,7 +70,7 @@ def build_cohort(snapshots: pd.DataFrame, coverage: pd.DataFrame,
         _identity(data, name)
     if s["observed_at"].isna().any():
         raise ValueError("snapshots must have observed_at")
-    if c[["start_at", "end_at"]].isna().any() or (c.end_at <= c.start_at).any():
+    if c[["start_at", "end_at"]].isna().any().any() or (c.end_at <= c.start_at).any():
         raise ValueError("coverage requires nonempty valid intervals")
     if v.violation_at.isna().any():
         raise ValueError("violations require violation_at")
@@ -121,8 +121,6 @@ def build_cohort(snapshots: pd.DataFrame, coverage: pd.DataFrame,
             target = first.violation_at
         else:
             target = end
-        intervals = c[(c.session_id == sid) & (c.verified == True)
-                      & (c.start_at <= target) & (c.end_at >= at)]
         # Support contiguous intervals through the exact target timestamp.
         spans = c[(c.session_id == sid) & (c.verified == True)
                   & (c.end_at >= at) & (c.start_at <= target)].sort_values("start_at")
