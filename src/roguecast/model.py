@@ -15,7 +15,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 
 FEATURES = [
     "agent_type", "attack_surface", "tool_calls_5m", "denied_actions_5m",
@@ -91,10 +91,16 @@ def split_chronological(data: pd.DataFrame, test_fraction: float = 0.25, horizon
     return train, test
 
 
+def _categorical_object_dtype(values):
+    """Allow string imputation when an entire categorical group is NaN float."""
+    return values.astype(object)
+
+
 def baseline() -> Pipeline:
     numeric = Pipeline([("impute", SimpleImputer(strategy="constant", fill_value=0, keep_empty_features=True)),
                         ("scale", StandardScaler())])
-    categorical = Pipeline([("impute", SimpleImputer(strategy="constant", fill_value="unknown", keep_empty_features=True)),
+    categorical = Pipeline([("as_object", FunctionTransformer(_categorical_object_dtype)),
+                            ("impute", SimpleImputer(strategy="constant", fill_value="unknown", keep_empty_features=True)),
                             ("onehot", OneHotEncoder(handle_unknown="ignore"))])
     return Pipeline([
         ("features", ColumnTransformer([
